@@ -1,46 +1,22 @@
-https://ultimatecourses.com/blog/angular-dependency-injection
-
+# Providers
 Providers in Angular are key to how we develop our applications, and injecting dependencies can be done in various ways. In this post, we’re going to debunk some terminology behind the @Inject() and @Injectable() decorators and explore the use cases for them. Then, we’ll dive into understanding tokens, providers and take a look behind the scenes at how Angular actually fetches and creates our dependencies, as well as some Ahead-of-Time source code explanations.
 
-Table of Contents	
-Injecting providers
-A new dependency injection system
-@Inject()
-@Injectable()
-Tokens and Dependency Injection
-Registering a provider
-Overriding providers
-Understanding Injectors
-Pre-compiled code
-AppModuleInjector
-AppModuleInjector properties
-Module imports
-Dependency Injection
-Closing thoughts
-Injecting providers
+### Injecting providers
 With most things Angular, there is a lot of magic happening when it comes to dependency injection (DI). With Angular 1.x we had a pretty simple approach using string tokens to fetch particular dependencies – I’m sure you know this:
-
+```js
 function SomeController($scope) {
   // use $scope
 }
 SomeController.$inject = ['$scope'];
-You can check out my old post on the DI annotation process for more on that if you like.
+```
 
-This was a great approach – but it came with some limitations. Typically we’d create various modules when building our applications, as well as importing external modules, such as feature modules or libraries (such as ui-router). Different modules couldn’t have controllers/services/etc with the same names, which would then cause conflicts during the compile phase (as dependencies with the same names would clash, thus overriding each other).
+This was a great approach – but it came with some limitations. Typically we’d create various modules when building our applications, as well as importing external modules, such as feature modules or libraries (such as `ui-router`). Different modules couldn’t have controllers/services/etc with the same names, which would then cause conflicts during the compile phase (as dependencies with the same names would clash, thus overriding each other).
 
 Fortunately for us, Angular’s new dependency injection has been completely remastered and rewritten, and it comes with much more power and flexibility.
 
-Once you've finished reading this post, do you want to learn even more?
-
-angular
-Master Angular with our online courses
-
-Award winning courses trusted by thousands, there’s no better place to learn
-
-Explore Courses Go to angular courses
-A new dependency injection system
+#### A new dependency injection system
 When injecting a service (a provider) into your components/services, we specify what provider we need via a type definition in the constructor. For example:
-
+```js
 import { Component } from '@angular/core';
 import { Http } from '@angular/http';
 
@@ -53,14 +29,16 @@ class ExampleComponent {
     // use `this.http` which is the Http provider
   }
 }
-The type definition here is Http (note the capital H), and Angular automagically assigns this to http.
+```
 
-At this point, it’s pretty magical how it works. Type definitions are specific to TypeScript, so our compiled JavaScript code should theoretically not know anything about what our http parameter is when it comes to running it in the browser.
+The type definition here is `Http` (note the capital H), and Angular automagically assigns this to `http`.
 
-Inside our tsconfig.json files we’ll likely have emitDecoratorMetadata set to true. This emits metadata about the type of the parameter into a decorator in our compiled JavaScript output.
+At this point, it’s pretty magical how it works. Type definitions are specific to TypeScript, so our compiled JavaScript code should theoretically not know anything about what our `http` parameter is when it comes to running it in the browser.
+
+Inside our `tsconfig.json` files we’ll likely have `emitDecoratorMetadata` set to `true`. This emits metadata about the type of the parameter into a decorator in our compiled JavaScript output.
 
 Let’s take a look at what our code actually gets compiled into (I’ve kept the ES6 imports in for clarity):
-
+```js
 import { Component } from '@angular/core';
 import { Http } from '@angular/http';
 
@@ -80,21 +58,27 @@ ExampleComponent = __decorate(
   ],
   ExampleComponent
 );
-From here, we can see the compiled code knows about http being equal to the Http service provided by @angular/http – it’s added as a decorator for our class here:
+```
 
+From here, we can see the compiled code knows about `http` being equal to the `Http` service provided by `@angular/http` – it’s added as a decorator for our class here:
+```js
 __metadata('design:paramtypes', [Http]);
-So essentially, the @Component decorator is transformed into plain ES5, and some additional metadata is supplied through the __decorate assignment. Which in turn tells Angular to lookup the Http token and supply it as a first parameter to the Component’s constructor – assigning it to this.http:
+```
 
+So essentially, the `@Component` decorator is transformed into plain ES5, and some additional `metadata` is supplied through the `__decorate` assignment. Which in turn tells Angular to lookup the `Http` token and supply it as a first parameter to the Component’s `constructor` – assigning it to `this.http`:
+```js
 function ExampleComponent(http) {
   this.http = http;
 }
-This looks a little familiar to our old from $inject, however the class is being used as a token instead of a string. Power, and no naming conflicts.
+```
 
-You might have heard of the concept of a “token” (or even OpaqueToken). This is how Angular stores and retrieves our providers. A token is a key that is used to reference a provider (our Http import is a provider). Unlike conventional keys however, these keys can be anything – such as objects, classes, strings, etc.
+This looks a little familiar to our old from `$inject`, however the class is being used as a token instead of a string. Power, and no naming conflicts.
 
-@Inject()
-So where does @Inject come into play? We could alternatively write our component like this:
+>You might have heard of the concept of a “token” (or even `OpaqueToken`). This is how Angular stores and retrieves our providers. A token is a key that is used to reference a provider (our `Http` import is a provider). Unlike conventional keys however, these keys can be anything – such as objects, classes, strings, etc.
 
+#### @Inject()
+So where does `@Inject` come into play? We could alternatively write our component like this:
+```js
 import { Component, Inject } from '@angular/core';
 import { Http } from '@angular/http';
 
@@ -107,22 +91,26 @@ class ExampleComponent {
     // use `this.http` which is the Http provider
   }
 }
-At this point, @Inject is a manual way of specifying this lookup token, followed by the lowercase http argument to tell Angular what to assign it against.
+```
 
-This could (and will) get very messy when a component or service requires a lot of dependencies. As Angular supports resolving dependencies from the emitted metadata, there’s no need to use @Inject most of the time.
+At this point, `@Inject` is a manual way of specifying this lookup token, followed by the lowercase http argument to tell Angular what to assign it against.
 
-The only time we’d need to use @Inject is alongside something like an OpaqueToken – which creates a unique blank token to be used as a dependency injection provider.
+This could (and will) get very messy when a component or service requires a lot of dependencies. As Angular supports resolving dependencies from the emitted metadata, there’s no need to use `@Inject` most of the time.
 
-The reason we use @Inject is because we cannot use an OpaqueToken as the type of a parameter, for instance this will not work:
+The only time we’d need to use `@Inject` is alongside something like an OpaqueToken – which creates a unique blank token to be used as a dependency injection provider.
 
+The reason we use `@Inject` is because we cannot use an OpaqueToken as the type of a parameter, for instance this will not work:
+```js
 const myToken = new OpaqueToken('myValue');
 
 @Component(...)
 class ExampleComponent {
   constructor(private token: myToken) {}
 }
-Here, myToken is not a Type, it’s a value – which means TypeScript cannot compile it. However, when we introduce @Inject alongside an OpaqueToken, things will work out nicely:
+```
 
+Here, `myToken` is not a Type, it’s a value – which means TypeScript cannot compile it. However, when we introduce `@Inject` alongside an `OpaqueToken`, things will work out nicely:
+```js
 const myToken = new OpaqueToken('myValue');
 
 @Component(...)
@@ -131,28 +119,32 @@ class ExampleComponent {
     // use the provider for `token`
   }
 }
-We won’t dive into OpaqueToken any further here, but this gives you an example of using @Inject for manually specifying tokens to be injected, as well as showing that the token can be anything. This means, we’re not restricted to what TypeScript classifies as a “type”.
+```
 
-@Injectable()
-It’s a common misbelief that this is a required decorator on any class that we plan on injecting into a component/service in our apps. This may change however, as there is a current issue to make @Injectable() mandatory (however this is pretty fresh and may not land for a while, or ever).
+We won’t dive into `OpaqueToken` any further here, but this gives you an example of using `@Inject` for manually specifying tokens to be injected, as well as showing that the token can be anything. This means, we’re not restricted to what TypeScript classifies as a “type”.
+
+#### @Injectable()
+It’s a common misbelief that this is a required decorator on any class that we plan on injecting into a component/service in our apps. This may change however, as there is a current issue to make `@Injectable()` mandatory (however this is pretty fresh and may not land for a while, or ever).
 
 When using Angular decorators, the decorated class stores metadata about itself in a format that Angular can read – this includes the metadata about what dependencies it needs to fetch and inject.
 
-If no Angular decorator has been used on a class there is no way for Angular to read what dependencies it requires. This is why we need to use @Injectable().
+If no Angular decorator has been used on a class there is no way for Angular to read what dependencies it requires. This is why we need to use `@Injectable()`.
 
-If our service injects providers we must add @Injectable(), which providers no extra functionality, to tell Angular to store that metadata it needs.
+If our service injects providers we must add `@Injectable()`, which providers no extra functionality, to tell Angular to store that metadata it needs.
 
 Therefore, if our service looks like this:
-
+```js
 export class UserService {
   isAuthenticated(): boolean {
     return true;
   }
 }
+```
+
 We don’t need to decorate it to be able to inject it into a component for example, because it doesn’t inject any providers itself.
 
 However, if our service looks like this and contains a dependency (Http):
-
+```js
 import { Http } from '@angular/http';
 
 export class UserService {
@@ -161,10 +153,12 @@ export class UserService {
     return this.http.get('/api/user').map((res) => res.json());
   }
 }
-This would break as the Http provider metadata would not be stored for Angular to compose it correctly.
+```
 
-We can simply add @Injectable() to solve this:
+This would break as the `Http` provider metadata would not be stored for Angular to compose it correctly.
 
+We can simply add `@Injectable()` to solve this:
+```js
 import { Injectable } from '@angular/core';
 import { Http } from '@angular/http';
 
@@ -175,14 +169,16 @@ export class UserService {
     return this.http.get('/api/user').map((res) => res.json());
   }
 }
-At this point, Angular is aware of the Http token and can supply it to http.
+```
 
-Tokens and Dependency Injection
+At this point, Angular is aware of the `Http` token and can supply it to `http`.
+
+### Tokens and Dependency Injection
 Now that we know how Angular knows what to inject, we can learn how it resolves our dependencies and instantiates them.
 
-Registering a provider
-Let’s take a look at how we’d register a typical service inside an NgModule.
-
+#### Registering a provider
+Let’s take a look at how we’d register a typical service inside an `NgModule`.
+```js
 import { NgModule } from '@angular/core';
 
 import { AuthService } from './auth.service';
@@ -191,8 +187,9 @@ import { AuthService } from './auth.service';
   providers: [AuthService],
 })
 class ExampleModule {}
+```
 The above is shorthand for this:
-
+```js
 import { NgModule } from '@angular/core';
 
 import { AuthService } from './auth.service';
@@ -205,14 +202,17 @@ import { AuthService } from './auth.service';
     },
   ],
 })
+
 class ExampleModule {}
-The provide property in the object is the token for the provider that we’re registering. This means that Angular can look up what is stored under the token for AuthService using the useClass value.
+```
 
-This provides many benefits. The first, we can now have two providers with the exact same class name and Angular will not have any issues in resolving the correct service. Secondly, we can also override an existing provider with a different provider whilst keeping the token the same.
+The `provide` property in the object is the token for the provider that we’re registering. This means that Angular can look up what is stored under the token for `AuthService` using the `useClass` value.
 
-Overriding providers
-Here’s what our AuthService might look like:
+This provides many benefits. The first, we can now have two providers with the exact same `class` name and Angular will not have any issues in resolving the correct service. Secondly, we can also override an existing provider with a different provider whilst keeping the token the same.
 
+#### Overriding providers
+Here’s what our `AuthService` might look like:
+```js
 import { Injectable } from '@angular/core';
 import { Http } from '@angular/http';
 
@@ -231,8 +231,10 @@ export class AuthService {
   }
 
 }
-Imagine we use this service heavily throughout our application. For instance, our (streamlined) login form uses it to log the user in:
+```
 
+Imagine we use this service heavily throughout our application. For instance, our (streamlined) login form uses it to log the user in:
+```js
 import { Component } from '@angular/core';
 import { AuthService } from './auth.service';
 
@@ -257,8 +259,11 @@ export class LoginComponent {
   }
 
 }
+```
+
 Then we can bind our user information using the service to display the username:
 
+```js
 @Component({
   selector: 'user-info',
   template: `
@@ -280,8 +285,11 @@ class UserInfoComponent implements OnInit {
   }
 
 }
-We then hook this all up into a module, such as AuthModule:
+```
 
+We then hook this all up into a module, such as `AuthModule`:
+
+```js
 import { NgModule } from '@angular/core';
 
 import { AuthService } from './auth.service';
@@ -294,10 +302,12 @@ import { UserInfoComponent } from './user-info.component';
   providers: [AuthService],
 })
 export class AuthModule {}
-There could also be various components that use the same AuthService. But let’s assume we now have a new requirement, and need to change our authentication method over to a library that lets us use Facebook to log users in.
+```
 
-We could go through every single component and change all the imports to point to this new provider, however we can instead utilise the power of tokens and override our AuthService to use the FacebookAuthService:
+There could also be various components that use the same `AuthService`. But let’s assume we now have a new requirement, and need to change our authentication method over to a library that lets us use Facebook to log users in.
 
+We could go through every single component and change all the imports to point to this new provider, however we can instead utilise the power of tokens and override our `AuthService` to use the `FacebookAuthService`:
+```js
 import { NgModule } from '@angular/core';
 
 // totally made up
@@ -318,18 +328,20 @@ import { UserInfoComponent } from './user-info.component';
   ],
 })
 export class AuthModule {}
-So you can see here we’re using the long-hand form of registering the provider, and essentially swapping out the useClass property with a different value. This way, we can use AuthService everywhere in our application – without making further changes.
+```
 
-This is because Angular uses AuthService as the token to search for our provider. As we’ve replaced it with a new class FacebookAuthService, all of our components will use that instead.
+So you can see here we’re using the long-hand form of registering the provider, and essentially swapping out the `useClass` property with a different value. This way, we can use `AuthService` everywhere in our application – without making further changes.
 
-Understanding Injectors
-If you’ve made it this far, you should hopefully have an understanding of tokens and the dependency injection system of Angular, however in this next chapter – we’re actually going to break down the compiled AoT code from Angular to walk through it a little further.
+This is because Angular uses `AuthService` as the token to search for our provider. As we’ve replaced it with a new class `FacebookAuthService`, all of our components will use that instead.
 
-Pre-compiled code
+### Understanding Injectors
+If you’ve made it this far, you should hopefully have an understanding of tokens and the dependency injection system of Angular, however in this next chapter – we’re actually going to break down the compiled [AoT](https://angular.io/docs/ts/latest/cookbook/aot-compiler.html) code from Angular to walk through it a little further.
+
+#### Pre-compiled code
 Before we dive into the compiled code, let’s look at the pre-compiled version of the code. Precompiled? That’s the code you and I write before Ahead-of-Time compilation, so essentially everything you write is pre-compiled and Angular can either compile it in the browser for you via JiT or for a more performant approach we can offline compile (AoT).
 
-So, let’s assume you’ve built out your application – but we’re just going to walk through a single piece of NgModule code:
-
+So, let’s assume you’ve built out your application – but we’re just going to walk through a single piece of `NgModule` code:
+```js
 import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { Routes, RouterModule } from '@angular/router';
@@ -349,15 +361,17 @@ export const ROUTER_CONFIG: Routes = [
   declarations: [AppComponent],
 })
 export class AppModule {}
+```
+
 This should look pretty familiar – we have a root component and some routes that we’re routing to different modules with. So what’s the real code look like, as we know Angular is compiled?
 
 Angular will produce VM (virtual machine) friendly code, to make it as performant as possible, which is fantastic. What we’ll do is dive into that compiled code and explain it a little further.
 
-AppModuleInjector
-Angular will generate an injector for each of our modules, so in our case it will take AppModule (our decorated class) and create an injector named AppModuleInjector.
+#### AppModuleInjector
+Angular will generate an injector for each of our modules, so in our case it will take `AppModule` (our decorated class) and create an injector named `AppModuleInjector`.
 
-Let’s look at the generated code for our AppModuleInjector and break it down:
-
+Let’s look at the generated code for our `AppModuleInjector` and break it down:
+```js
 import { NgModuleInjector } from '@angular/core/src/linker/ng_module_factory';
 import { CommonModule } from '@angular/common/src/common_module';
 import { ApplicationModule, _localeFactory } from '@angular/core/src/application_module';
@@ -471,20 +485,24 @@ class AppModuleInjector extends NgModuleInjector<AppModule> {
     this._ApplicationRef__10.ngOnDestroy();
   }
 }
-This might look a bit insane (and the actual generated code is a lot more insane) but let’s look at what is actually happening here.
+```
+
+>This might look a bit insane (and the actual generated code is a lot more insane) but let’s look at what is actually happening here.
 
 I’ve changed all the imports to be named imports for readability as in the actual generated code, each module is imported using a wildcard to avoid naming conflicts.
 
-For instance, HttpModule would be imported as something like this:
-
+For instance, `HttpModule` would be imported as something like this:
+```js
 import * as import6 from '@angular/http/src/http_module';
-Which then is referred to using import6.HttpModule instead of HttpModule.
+```
+
+Which then is referred to using `import6.HttpModule` instead of `HttpModule`.
 
 There are three things that we need to take in from this generated code. The properties on the class, the module imports and how the dependency injection mechanism works.
 
-AppModuleInjector properties
-Properties are created on the AppModuleInjector for each provider/dependency:
-
+#### AppModuleInjector properties
+Properties are created on the `AppModuleInjector` for each provider/dependency:
+```js
 // ...
 class AppModuleInjector extends NgModuleInjector<AppModule> {
   _CommonModule_0: CommonModule;
@@ -492,37 +510,44 @@ class AppModuleInjector extends NgModuleInjector<AppModule> {
   _BrowserModule_2: BrowserModule;
   // ...
 }
+```
+
 This is a snippet from the above compiled output – so we’re going to focus on the three properties defined on the class:
 
-CommonModule
-ApplicationModule
-BrowserModule
-Our module only declares the BrowserModule, so where have the CommonModule and ApplicationModule come from? These are actually exported by the BrowserModule for us, so we don’t need to import them ourselves.
+- CommonModule
+- ApplicationModule
+- BrowserModule
+
+Our module only declares the `BrowserModule`, so where have the `CommonModule` and `ApplicationModule` come from? These are actually exported by the `BrowserModule` for us, so we don’t need to import them ourselves.
 
 There is also a number appended on the end of every property in the module. Much like using wildcard imports, this is to avoid potential naming conflicts between providers.
 
 We could import two modules that use a service with a shared name and without the incrementing numbers, they’d both be assigned to the same property, potentially causing errors further down the line.
 
-Module imports
+#### Module imports
 When compiled, Angular uses the direct path for each provider that it imports, so for instance when we write this code:
-
+```js
 import { CommonModule } from '@angular/common';
-The AoT’d version will look a little like this:
+```
 
+The AoT’d version will look a little like this:
+```js
 import * as import5 from '@angular/common/src/common_module';
+```
+
 This is so when the code is then compiled and bundled together, we can take advantage of tree-shaking and only include the parts of each module we actually use.
 
-Dependency Injection
+#### Dependency Injection
 Each module deals with its own dependency injection, going to the parent module if it doesn’t have a dependency until it is either found or not found (then we get an error).
 
 It’s important to note that all dependencies use a token to uniquely identify them, both when they’re registered and when they are looked up.
 
-There’s two different ways that our dependencies are initiated, either in createInternal or as a getter on a property.
+There’s two different ways that our dependencies are initiated, either in `createInternal` or as a getter on a property.
 
-For all of our imported modules and their exported modules, they are created within createInternal. This is invoked as soon as the module is instantiated.
+>For all of our imported modules and their exported modules, they are created within createInternal. This is invoked as soon as the module is instantiated.
 
-For example, we are using BrowserModule and HttpModule, and they are created here:
-
+For example, we are using `BrowserModule` and `HttpModule`, and they are created here:
+```js
 class AppModuleInjector extends NgModuleInjector<AppModule> {
   _CommonModule_0: CommonModule;
   _ApplicationModule_1: ApplicationModule;
@@ -540,16 +565,18 @@ class AppModuleInjector extends NgModuleInjector<AppModule> {
     return this._AppModule_6;
   }
 }
-You can see that BrowserModule‘s two exports – CommonModule and ApplicationModule are created, as well our other imported modules. Our actual module is created too (AppModule) so it can be consumed by other modules.
+```
+
+You can see that `BrowserModule`'s two exports – `CommonModule` and `ApplicationModule` are created, as well our other imported modules. Our actual module is created too (`AppModule`) so it can be consumed by other modules.
 
 For all the other providers, they are created as and when they’re needed via a getter within the class. This is to avoid creating instances of providers when they aren’t needed, also increasing the initial rendering performance.
 
-Whenever you hear of an injector in Angular, it’s referring to the generated (compiled) code from our modules.
+>Whenever you hear of an injector in Angular, it’s referring to the generated (compiled) code from our modules.
 
-When Angular looks up a dependency (such as ones we inject via a constructor), it looks in the module injector and traverses up the parent modules if it fails to find it. Should it not exist, you’ll be thrown an error.
+When Angular looks up a dependency (such as ones we inject via a `constructor`), it looks in the module injector and traverses up the parent modules if it fails to find it. Should it not exist, you’ll be thrown an error.
 
-When we use a type definition in our constructor, Angular uses those types (which are classes) as the token for finding our dependencies. That token is then passed into getInternal and the instance of the dependency is returned if it exists, source code extract again:
-
+When we use a type definition in our `constructor`, Angular uses those types (which are classes) as the token for finding our dependencies. That token is then passed into `getInternal` and the instance of the dependency is returned if it exists, source code extract again:
+```js
 class AppModuleInjector extends NgModuleInjector<AppModule> {
   // new BrowserModule(this.parent.get(BrowserModule, (null as any)));
   _BrowserModule_2: BrowserModule;
@@ -574,9 +601,8 @@ class AppModuleInjector extends NgModuleInjector<AppModule> {
     return notFoundResult;
   }
 }
-So inside the getInternal method, you can see Angular is checking for our tokens using simple if statements, and will return the relevant property for the provider – if found.
+```
 
-Otherwise, we’ll bail out the getInternal method with a returned notFoundResult. Whilst Angular is traversing up our modules to find the desired dependency, this notFoundResult will be null – until it either finds the dependency, or reaches the root module and still cannot find it, you’ll be thrown an error.
+So inside the `getInternal` method, you can see Angular is checking for our tokens using simple `if` statements, and will return the relevant property for the provider – if found.
 
-Closing thoughts
-Hopefully this post has given you some in-depth insights into @Inject, @Injectable, tokens and providers and how Angular generates VM friendly code when AoT compiling.
+Otherwise, we’ll bail out the `getInternal` method with a returned `notFoundResult`. Whilst Angular is traversing up our modules to find the desired dependency, this `notFoundResult` will be `null` – until it either finds the dependency, or reaches the root module and still cannot find it, you’ll be thrown an error.
