@@ -101,17 +101,17 @@ Parameter decorators are quite interesting. You may have come across these when 
 Parameter decorators allow us to decorate parameters in our class constructors. An example of this is `@Inject` that lets us tell Angular what we want that parameter to be initiated with:
 
 ```js
-mport { Component, Inject } from '@angular/core';
+import { Component, Inject } from '@angular/core';
 import { MyService } from './my-service';
 
 @Component({
-selector: 'example-component',
-template: 'Woo a component!'
+  selector: 'example-component',
+  template: 'Woo a component!'
 })
 export class ExampleComponent {
-constructor(@Inject(MyService) myService) {
-console.log(myService); // MyService
-}
+  constructor(@Inject(MyService) myService) {
+    console.log(myService); // MyService
+  }
 }
 ```
 Due to the metadata that TypeScript exposes for us we don’t actually have to do this for our providers. We can just allow TypeScript and Angular to do the hard work for us by specifying the provider to be injected as the parameter type:
@@ -120,20 +120,20 @@ import { Component } from '@angular/core';
 import { MyService } from './my-service';
 
 @Component({
-selector: 'example-component',
-template: 'Woo a component!'
+  selector: 'example-component',
+  template: 'Woo a component!'
 })
 export class ExampleComponent {
-constructor(myService: MyService) {
-console.log(myService); // MyService
-}
+  constructor(myService: MyService) {
+    console.log(myService); // MyService
+  }
 }
 ```
 
 ### Creating a decorator
 It makes things a lot easier if we understand what a decorator is actually doing before we look into how Angular uses them under the hood. To do this, we can create a quick example decorator.
 
-Decorator functions
+#### Decorator functions
 Decorators are actually just functions, it’s as simple as that, and are called with whatever they are decorating. A method decorator will be called with the value of the method it’s decorating, and a class decorator will be called with the class to be decorated.
 
 Let’s quickly make a decorator that we can use on a class to demonstrate this a little further. This decorator is just going to simply log the class to the console:
@@ -142,7 +142,7 @@ function Console(target) {
   console.log('Our decorated class', target);
 }
 ```
-Here, we have created Console (using the uppercase naming convention Angular uses) and are specifying a single argument called target. The target will in fact be the class that we decorate, which means we can now decorate any class with our decorator and see it outputted in the console:
+Here, we have created `Console` (using the uppercase naming convention Angular uses) and are specifying a single argument called `target`. The target will in fact be the class that we decorate, which means we can now decorate any class with our decorator and see it outputted in the console:
 ```js
 @Console
 class ExampleClass {
@@ -155,9 +155,9 @@ class ExampleClass {
 ### Passing data to a decorator
 When we use the decorators in Angular we pass in some form of configuration, specific to the decorator.
 
-For example, when we use @Component we pass through an object, and with @HostListener we pass through a string as the first argument (the event name, such as 'click') and optionally an array of strings for further variables (such as $event) to be passed through to the decorated method.
+For example, when we use `@Component` we pass through an object, and with `@HostListener` we pass through a string as the first argument (the event name, such as `'click'`) and optionally an array of strings for further variables (such as `$event`) to be passed through to the decorated method.
 
-Let’s change our code above to execute the Console function with a value to match how we use the Angular decorators.
+Let’s change our code above to execute the `Console` function with a value to match how we use the Angular decorators.
 ```js
 @Console('Hey!')
 class ExampleClass {
@@ -166,9 +166,9 @@ class ExampleClass {
   }
 }
 ```
-If we ran this code now, we’d only get 'Hey!' outputted to the console. That’s because our decorator hasn’t returned a function for the class to be given to. The output of @Console('Hey!') is void.
+If we ran this code now, we’d only get `'Hey!'` outputted to the console. That’s because our decorator hasn’t returned a function for the class to be given to. The output of `@Console('Hey!')` is `void`.
 
-We would need to adapt our Console decorator to return a function closure for the class to be given to. That way we can both receive a value from the decorator (in our case, the string Hey!) and also the class that it’s applied to:
+We would need to adapt our `Console` decorator to return a function closure for the class to be given to. That way we can both receive a value from the decorator (in our case, the string `Hey!`) and also the class that it’s applied to:
 ```js
 function Console(message) {
   // access the "metadata" message
@@ -190,11 +190,10 @@ class ExampleClass {
 // console output: 'Hey!'
 // console output: 'Our decorated class', class ExampleClass{}...
 ```
-You can see the changes here.
 
 This is the basis for how the decorators in Angular work. They first of all take a configuration value and then receive the class/method/property to apply the decoration to. Now that we have a brief understanding of what a decorator actually does, we’re going to walk through how Angular creates and uses it’s own decorators.
 
-## What Angular decorators actually do
+### What Angular decorators actually do
 Every type of decorator shares the same core functionality. From a purely decorative point of view, `@Component` and `@Directive` both work in the same way, as do `@Input` and `@Output`. Angular does this by using a factory for each type of decorator.
 
 Let’s look at the most common decorator in Angular, the `@Component`.
@@ -282,7 +281,7 @@ export class TestComponent {
   onClick: Function;
 }
 ```
-At the same time, Angular also uses the reflect API (commonly polyfilled using reflect-metadata) to store these annotations, using the class as an array. This means that it can then later on fetch all of the annotations for a specific class just by being pointed to the class.
+At the same time, Angular also uses the reflect API (commonly polyfilled using `reflect-metadata`) to store these annotations, using the class as an array. This means that it can then later on fetch all of the annotations for a specific class just by being pointed to the class.
 
 ### How decorators are applied
 So we know now how and why Angular uses decorators, but how are they actually applied to a class?
